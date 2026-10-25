@@ -92,6 +92,27 @@ it receives in real bash, which checks how remote scripts actually behave:
 
 ## Installation
 
+### Packaged builds (no Python needed)
+
+Each tagged version is published on the repository's
+[Releases page](https://github.com/Ramesh-Mokkapati/Snoopy/releases):
+
+| Download | Run |
+|---|---|
+| `Snoopy-<version>-windows-x64.zip` | Unzip anywhere and start `Snoopy\Snoopy.exe` |
+| `Snoopy-<version>-linux-x64.tar.gz` | `tar -xzf Snoopy-<version>-linux-x64.tar.gz` and start `Snoopy/Snoopy` |
+
+- **Your data stays next to the program.** A packaged Snoopy keeps `Conf/` and
+  `logs/` beside the executable. Put the folder somewhere you can write to (not
+  `C:\Program Files`), and keep `Conf/` when you upgrade by unpacking the new
+  version over the old folder.
+- **Windows SmartScreen:** the program isn't code-signed, so SmartScreen may
+  warn on first start. Choose *More info → Run anyway*.
+- **Linux compatibility:** the build is made on Ubuntu 24.04, so it needs a
+  distribution at least that new (glibc 2.39 or later).
+
+To run from source instead, follow the steps below.
+
 ### Windows
 
 From the project folder, create a virtual environment and install the packages:
@@ -490,6 +511,9 @@ task's Details page for its last run.
 SnoopyApp.py             Entry point: starts the wx application
 requirements.txt         Python dependencies (exact versions)
 .github/workflows/ci.yml Build pipeline (GitHub Actions): tests on Windows and Linux
+.github/workflows/release.yml  Packaged builds and GitHub Release for each version tag
+Snoopy.spec              PyInstaller recipe for the packaged app
+requirements-build.txt   Extra dependency for building packages (PyInstaller)
 images/                  Icons and splash screen
 docs/
   screenshots/             Screenshots used in this README
@@ -509,7 +533,7 @@ Utils/
   ConfigManager.py         INI file reading/writing (keeps key case and order)
   Credentials.py           Passwords in the system keyring (via keyring), in-memory fallback
   HelpText.py              Welcome page and Help window text
-  Paths.py                 File locations, resolved relative to the app
+  Paths.py                 File locations: the app folder, or next to the executable when packaged
   ProcessManager.py        Run a local command without a shell and log it
   TestApp.py               Test runner
   TestRemote.py            SSH and local-runner tests
@@ -581,6 +605,35 @@ It has two jobs:
 The badge at the top of this README shows the result of the latest run on
 `main`. A failing step marks the run red; open it on the Actions tab to see the
 log.
+
+### Releases
+
+Pushing a version tag publishes packaged builds:
+
+```bash
+git tag v1.0
+git push origin v1.0
+```
+
+This runs [.github/workflows/release.yml](.github/workflows/release.yml):
+1. All the CI tests above. A failing test stops the release.
+2. Builds with PyInstaller on Windows and Ubuntu 24.04.
+3. Creates the GitHub Release *Snoopy v1.0* with both archives and notes
+   generated from the commits.
+
+Starting *Release* by hand from the Actions tab builds both archives as
+downloadable artifacts of that run, without publishing a release.
+
+**Building a package locally** (the same recipe, [Snoopy.spec](Snoopy.spec)):
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+.venv\Scripts\python.exe -m PyInstaller --noconfirm Snoopy.spec
+```
+
+The result is `dist/Snoopy/` (`build/` and `dist/` are git-ignored). On Linux,
+PyInstaller also needs `binutils` and the Python shared library (on Ubuntu:
+`sudo apt install binutils libpython3.12t64`).
 
 **Screenshots**: after changing the UI, regenerate the images in
 `docs/screenshots` with:

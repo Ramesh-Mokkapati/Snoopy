@@ -6,12 +6,13 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:      # "Run workflow" button on the Actions tab
+  workflow_call:          # release.yml runs these tests before building a release
 
 permissions:
   contents: read
 
 concurrency:              # a newer push to the same branch cancels the older run
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -20,9 +21,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -45,7 +46,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The Linux install route from README.md: wxPython from the distribution,
       # everything else from requirements.txt (which skips wxPython on Linux).

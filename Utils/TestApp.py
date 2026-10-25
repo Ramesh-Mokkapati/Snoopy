@@ -36,6 +36,40 @@ def write_sample_config(path):
 class TestApp:
 
     @staticmethod
+    def TestPaths():
+        """From source, data and resources are in the project folder; when packaged,
+        data goes next to the executable and resources come from the bundle."""
+        import importlib
+        from . import Paths
+        project = os.path.dirname(os.path.dirname(os.path.abspath(Paths.__file__)))
+        assert Paths.APP_DIR == Paths.BUNDLE_DIR == project, (Paths.APP_DIR, Paths.BUNDLE_DIR)
+        assert Paths.image("Snoopy.png") == os.path.join(project, "images", "Snoopy.png")
+        assert os.path.isfile(Paths.image("Snoopy.png"))
+
+        saved = (getattr(sys, "frozen", None), getattr(sys, "_MEIPASS", None), sys.executable)
+        install = os.path.join(tempfile.gettempdir(), "Snoopy-install")
+        bundle = os.path.join(install, "_internal")
+        try:
+            sys.frozen, sys._MEIPASS, sys.executable = True, bundle, os.path.join(install, "Snoopy.exe")
+            importlib.reload(Paths)
+            assert Paths.APP_DIR == install and Paths.BUNDLE_DIR == bundle, (Paths.APP_DIR, Paths.BUNDLE_DIR)
+            assert Paths.CONF_FILE == os.path.join(install, "Conf", "Config.ini")
+            assert Paths.HOSTS_DIR == os.path.join(install, "Conf", "Hosts")
+            assert Paths.LOG_DIR == os.path.join(install, "logs")
+            assert Paths.image("Snoopy.png") == os.path.join(bundle, "images", "Snoopy.png")
+        finally:
+            for name, value in (("frozen", saved[0]), ("_MEIPASS", saved[1])):
+                if value is None:
+                    if hasattr(sys, name):
+                        delattr(sys, name)
+                else:
+                    setattr(sys, name, value)
+            sys.executable = saved[2]
+            importlib.reload(Paths)
+        assert Paths.APP_DIR == project
+        print("Paths: OK")
+
+    @staticmethod
     def TestCredentials():
         host, user = "snoopy-selftest.invalid", "selftest"
         Credentials.set_password(host, user, "dummy-value")
@@ -174,6 +208,7 @@ class TestApp:
 
 
 if __name__ == '__main__':
+    TestApp.TestPaths()
     TestApp.TestCredentials()
     TestApp.TestConfigManager()
     TestApp.TestHostStore()
