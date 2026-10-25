@@ -1,5 +1,7 @@
 # Snoopy
 
+[![CI](https://github.com/Ramesh-Mokkapati/Snoopy/actions/workflows/ci.yml/badge.svg)](https://github.com/Ramesh-Mokkapati/Snoopy/actions/workflows/ci.yml)
+
 Snoopy is a desktop tool for Windows and Linux for organising deployment and maintenance
 scripts and running them on one or more servers. Scripts are grouped by
 **host** and **category** in a tree. Pick a task, type its parameters and press
@@ -487,6 +489,7 @@ task's Details page for its last run.
 ```
 SnoopyApp.py             Entry point: starts the wx application
 requirements.txt         Python dependencies (exact versions)
+.github/workflows/ci.yml Build pipeline (GitHub Actions): tests on Windows and Linux
 images/                  Icons and splash screen
 docs/
   screenshots/             Screenshots used in this README
@@ -510,6 +513,7 @@ Utils/
   ProcessManager.py        Run a local command without a shell and log it
   TestApp.py               Test runner
   TestRemote.py            SSH and local-runner tests
+  TestGUI.py               GUI smoke test (main window on demo data)
   FakeSSHServer.py         In-process SSH/SFTP server used by the tests
 ```
 
@@ -548,6 +552,35 @@ No real server is needed. To also try the dialog helpers interactively:
 ```powershell
 .venv\Scripts\python.exe -m Utils.TestApp --gui
 ```
+
+**GUI smoke test**: this starts the real main window on demo data and
+exercises it end to end:
+- adding a local host and an SSH host (the built-in test server)
+- running a local task and a remote script
+- the remote file picker and the Remote Files tab
+- menus, help and search
+
+Dialogs are answered automatically and your `Conf/` isn't used:
+
+```powershell
+.venv\Scripts\python.exe -m Utils.TestGUI                  # Windows
+xvfb-run -a .venv/bin/python -m Utils.TestGUI              # Linux without a display
+```
+
+### Build pipeline
+
+Every push to `main`, every pull request, and the *Run workflow* button on the
+GitHub **Actions** tab run [.github/workflows/ci.yml](.github/workflows/ci.yml).
+It has two jobs:
+
+| Job | Environment | Steps |
+|---|---|---|
+| Windows | `windows-latest`, Python 3.13, wxPython from `requirements.txt` | install, compile all sources, unit tests, GUI smoke test |
+| Linux | Ubuntu 24.04, the distribution's wxPython (the [Linux install route](#linux)) | install, compile all sources, unit tests (including real bash over SSH), GUI smoke test on a virtual display |
+
+The badge at the top of this README shows the result of the latest run on
+`main`. A failing step marks the run red; open it on the Actions tab to see the
+log.
 
 **Screenshots**: after changing the UI, regenerate the images in
 `docs/screenshots` with:
