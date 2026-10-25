@@ -94,8 +94,9 @@ it receives in real bash, which checks how remote scripts actually behave:
 
 ### Packaged builds (no Python needed)
 
-Each tagged version is published on the repository's
-[Releases page](https://github.com/Ramesh-Mokkapati/Snoopy/releases):
+Every successful build of `main` is published, with its version number, on the
+repository's [Releases page](https://github.com/Ramesh-Mokkapati/Snoopy/releases).
+The newest is marked *Latest*.
 
 | Download | Run |
 |---|---|
@@ -511,7 +512,8 @@ task's Details page for its last run.
 SnoopyApp.py             Entry point: starts the wx application
 requirements.txt         Python dependencies (exact versions)
 .github/workflows/ci.yml Build pipeline (GitHub Actions): tests on Windows and Linux
-.github/workflows/release.yml  Packaged builds and GitHub Release for each version tag
+.github/workflows/release.yml  After CI passes on main: tag, package and publish a GitHub Release
+VERSION                  First part of the version number (e.g. 1.0); the build adds the commit count
 Snoopy.spec              PyInstaller recipe for the packaged app
 requirements-build.txt   Extra dependency for building packages (PyInstaller)
 images/                  Icons and splash screen
@@ -534,6 +536,7 @@ Utils/
   Credentials.py           Passwords in the system keyring (via keyring), in-memory fallback
   HelpText.py              Welcome page and Help window text
   Paths.py                 File locations: the app folder, or next to the executable when packaged
+  Version.py               Version shown in About ("dev" from source; stamped by the release build)
   ProcessManager.py        Run a local command without a shell and log it
   TestApp.py               Test runner
   TestRemote.py            SSH and local-runner tests
@@ -608,21 +611,33 @@ log.
 
 ### Releases
 
-Pushing a version tag publishes packaged builds:
+Every push to `main` that passes CI is tagged, built and published
+automatically by [.github/workflows/release.yml](.github/workflows/release.yml).
+You don't tag anything by hand.
 
-```bash
-git tag v1.0
-git push origin v1.0
-```
+1. **Version:** the [VERSION](VERSION) file gives the first part (`1.0`), and the
+   number of commits on `main` gives the last, e.g. **1.0.42**. Numbers only go
+   up, and every build has one. Re-running the build of the same commit gets the
+   same number.
+2. **Build:** PyInstaller packages Snoopy on Windows and Ubuntu 24.04, with the
+   version stamped into the app, so it shows in *Help → About Snoopy*.
+3. **Publish:** creates the GitHub Release *Snoopy v1.0.42* with both archives
+   and notes generated from the commits. This also creates the tag `v1.0.42` on
+   that commit.
 
-This runs [.github/workflows/release.yml](.github/workflows/release.yml):
-1. All the CI tests above. A failing test stops the release.
-2. Builds with PyInstaller on Windows and Ubuntu 24.04.
-3. Creates the GitHub Release *Snoopy v1.0* with both archives and notes
-   generated from the commits.
+The tests already ran in CI, so a failing build never gets a release. If several
+commits are pushed together, CI and the release run for the last one, so that
+commit gets the tag.
 
-Starting *Release* by hand from the Actions tab builds both archives as
-downloadable artifacts of that run, without publishing a release.
+**Changing the version:** to start a new series, edit `VERSION` (e.g. `1.0` → `1.1`
+or `2.0`) and push. The next release is numbered `1.1.<commits>`.
+
+**Manual builds:** *Actions → Release → Run workflow* builds the current `main`
+and offers both archives as artifacts of that run. Tick *Publish* to also tag
+and release it.
+
+Each release keeps its archives on the Releases page. To tidy up old ones,
+delete them there; the tags can be deleted under *Tags*.
 
 **Building a package locally** (the same recipe, [Snoopy.spec](Snoopy.spec)):
 

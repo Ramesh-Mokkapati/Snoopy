@@ -1,31 +1,76 @@
-# Build packaged Snoopy apps and publish them as a GitHub Release.
+# Tag, build and publish every successful build of main.
 #
-#   git tag v1.0 && git push origin v1.0
+# When the CI workflow passes for a push to main, this workflow:
+#   1. works out the version: <VERSION file>.<number of commits on main>, e.g. 1.0.42
+#   2. builds Windows (.zip) and Linux (.tar.gz) packages with PyInstaller (Snoopy.spec),
+#      with that version stamped into the app (Utils/Version.py)
+#   3. publishes GitHub Release "Snoopy v1.0.42", which also creates the tag v1.0.42
+#      on that commit
+# The tests already ran in CI, so they are not repeated here. Change the first part
+# of the version by editing the VERSION file (e.g. 1.0 -> 1.1).
 #
-# runs the tests (ci.yml), builds Windows and Linux packages with PyInstaller
-# (Snoopy.spec) and attaches them to a "Snoopy v1.0" release. Running it by hand
-# from the Actions tab builds the packages as downloadable artifacts only.
+# "Run workflow" on the Actions tab builds the current main by hand; it only
+# publishes a release if you tick "Publish".
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Also tag the commit and publish a GitHub Release"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+concurrency:              # one release at a time, in order
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  test:
-    uses: ./.github/workflows/ci.yml
+  version:
+    name: Work out the version
+    # Only after a successful CI run for a push to main in this repository (not a pull request or fork)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0          # full history, to count the commits
+
+      - name: Version from VERSION file and commit count
+        id: version
+        run: |
+          base=$(tr -d ' \r\n' < VERSION)
+          version="$base.$(git rev-list --count HEAD)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "### Snoopy v$version ($(git rev-parse --short HEAD))" >> "$GITHUB_STEP_SUMMARY"
 
   build-windows:
     name: Package for Windows
-    needs: test
+    needs: version
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
 
       - uses: actions/setup-python@v7
         with:
@@ -35,12 +80,16 @@ jobs:
       - name: Install build dependencies
         run: python -m pip install -r requirements-build.txt
 
+      - name: Stamp version
+        shell: bash
+        run: printf 'VERSION = "%s"\n' "${{ needs.version.outputs.version }}" > Utils/Version.py
+
       - name: Build with PyInstaller
         run: python -m PyInstaller --noconfirm Snoopy.spec
 
       - name: Archive
         shell: pwsh
-        run: Compress-Archive -Path dist/Snoopy -DestinationPath "Snoopy-${{ github.ref_name }}-windows-x64.zip"
+        run: Compress-Archive -Path dist/Snoopy -DestinationPath "Snoopy-${{ needs.version.outputs.tag }}-windows-x64.zip"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -50,11 +99,13 @@ jobs:
 
   build-linux:
     name: Package for Linux
-    needs: test
+    needs: version
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
 
       # Same wxPython as the Linux CI job, plus what PyInstaller needs on Linux
       - name: Install system packages
@@ -67,11 +118,14 @@ jobs:
           python3 -m venv --system-site-packages .venv
           .venv/bin/pip install -r requirements-build.txt
 
+      - name: Stamp version
+        run: printf 'VERSION = "%s"\n' "${{ needs.version.outputs.version }}" > Utils/Version.py
+
       - name: Build with PyInstaller
         run: .venv/bin/python -m PyInstaller --noconfirm Snoopy.spec
 
       - name: Archive
-        run: tar -czf "Snoopy-${{ github.ref_name }}-linux-x64.tar.gz" -C dist Snoopy
+        run: tar -czf "Snoopy-${{ needs.version.outputs.tag }}-linux-x64.tar.gz" -C dist Snoopy
 
       - uses: actions/upload-artifact@v7
         with:
@@ -80,23 +134,32 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish GitHub Release
-    needs: [build-windows, build-linux]
-    if: startsWith(github.ref, 'refs/tags/v')
+    name: Tag and publish GitHub Release
+    needs: [version, build-windows, build-linux]
+    if: github.event_name == 'workflow_run' || inputs.publish
     runs-on: ubuntu-24.04
     permissions:
-      contents: write     # needed to create the release
+      contents: write     # needed to create the tag and the release
     steps:
       - uses: actions/download-artifact@v8
         with:
           path: packages
           merge-multiple: true
 
-      - name: Create release
+      # Creating the release also creates the tag on that commit. Re-running a build
+      # of the same commit replaces its files instead of making a second release.
+      - name: Create release and tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >
-          gh release create "${{ github.ref_name }}" packages/*
-          --repo "${{ github.repository }}"
-          --title "Snoopy ${{ github.ref_name }}"
-          --generate-notes
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.version.outputs.tag }}
+          SHA: ${{ needs.version.outputs.sha }}
+        run: |
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" packages/* --repo "$REPO" --clobber
+            echo "Updated existing release $TAG" >> "$GITHUB_STEP_SUMMARY"
+          else
+            gh release create "$TAG" packages/* --repo "$REPO" --target "$SHA" \
+              --title "Snoopy $TAG" --generate-notes --latest
+            echo "Published release $TAG" >> "$GITHUB_STEP_SUMMARY"
+          fi

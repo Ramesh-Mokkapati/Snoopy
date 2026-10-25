@@ -18,6 +18,7 @@ from .HelpText import welcome, help_text
 from .HostStore import HostContext, HostStore, HOST_SECTION, RESERVED_SECTIONS, NAME_PATTERN
 from .LocalHost import LocalHost, is_local, is_windows_script
 from .Paths import CONF_FILE, HOSTS_DIR, HISTORY_FILE, KNOWN_HOSTS_FILE, LOG_DIR, image
+from .Version import VERSION
 from .RemoteFilesPanel import RemoteFilesPanel, RemoteFileDialog
 from .RemoteHost import RemoteHost, HostKeyRejected, build_grep, build_zgrep, build_du, split_args
 
@@ -850,7 +851,7 @@ class SnoopyWindowMgr(wx.Frame):
         info = wx.adv.AboutDialogInfo()
         info.SetIcon(wx.Icon(image("SnoopySmall.png"), wx.BITMAP_TYPE_PNG))
         info.SetName('Snoopy')
-        info.SetVersion('1.0')
+        info.SetVersion(VERSION)
         info.SetDescription("An integrated deployment management tool")
         wx.adv.AboutBox(info, self)
 
