@@ -1,0 +1,59 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# ---------------------------------------------------------------------------
+# IDEs and OS files
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# Snoopy runtime data (created while the app runs)
+# ---------------------------------------------------------------------------
+# Output of every run
+logs/
+*.log
+
+# Remembered parameters and last-run results, per host
+*.history.ini
+Conf/History.ini
+
+# Backups made when upgrading Config.ini, and hosts removed in the app
+*.bak
+*.bak[0-9]*
+*.deleted-*
+
+# ---------------------------------------------------------------------------
+# Local configuration
+# ---------------------------------------------------------------------------
+# Your host list and host files contain machine-specific details (server
+# addresses, user names, paths to scripts on this PC), so they are not
+# committed. Snoopy starts fine without them and creates them when you add a
+# host (File > New Host). See README.md for the file format.
+# To version your configuration anyway, delete these two lines.
+Conf/Config.ini
+Conf/Hosts/
+
+# Passwords are never in these files: they are kept in Windows Credential
+# Manager. Trusted SSH host keys live in %APPDATA%\Snoopy\known_hosts.

@@ -1,0 +1,5 @@
+# On Linux, install wxPython from your distribution instead (PyPI has no Linux
+# builds and pip would compile it from source) - see README.md, "Installation".
+wxPython==4.3.1; sys_platform != "linux"
+keyring==25.7.0
+paramiko==5.0.0
